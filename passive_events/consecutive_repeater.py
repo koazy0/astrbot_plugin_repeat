@@ -55,29 +55,53 @@ class ConsecutiveRepeater:
         self.logger.debug(f"群 {group_id}: 消息 '{message[:20]}...' 连续次数 {count}")
         self.logger.info(f"[连续复读] 群 {group_id} - 消息:'{message}' 计数:{count}")
 
-    def should_repeat(self, group_id: str, message: str, sender_id: str) -> bool:
+    def should_repeat(self, group_id: str, message: str, sender_id: str, bot_id: str) -> bool:
         """判断是否应该复读
 
         Args:
             group_id: 群聊ID
             message: 消息内容
             sender_id: 发送者ID
+            bot_id: 机器人ID
 
         Returns:
             bool: 是否应该复读
         """
+        # 防止复读机器人自己的消息
+        if sender_id == bot_id:
+            return False
+
+        # 防止复读指令消息
+        if self._is_command_message(message):
+            return False
+
         state = self._group_states.get(group_id)
         if not state:
             return False
 
         last_message, count = state
 
-        # 连续2条相同消息，且发送者不是机器人自己
-        if count == 2 and message == last_message:
-            # 检查发送者是否是机器人（防止复读自己的复读）
-            # 这里需要传入 bot_id 来判断
+        # 连续2条相同消息时触发复读
+        if count >= 2 and message == last_message:
             return True
 
+        return False
+
+    def _is_command_message(self, message: str) -> bool:
+        """判断是否是指令消息"""
+        message = message.strip()
+        
+        # 检查所有指令
+        commands = [
+            "装填", "开枪", "状态", "帮助", "走火开", "走火关",
+            "抽签", "掷骰子", "丢骰子", "猜拳", "随机", "喝水", 
+            "测试", "sign", "greet"
+        ]
+        
+        for cmd in commands:
+            if message == cmd or message.startswith(cmd + " "):
+                return True
+                
         return False
 
     async def handle(
@@ -97,9 +121,10 @@ class ConsecutiveRepeater:
             Optional[str]: 复读结果或None
         """
         group_id = str(event.message_obj.group_id)
+        bot_id = self._get_bot_id(event)
 
         # 判断是否应该复读
-        if not self.should_repeat(group_id, message, sender_id):
+        if not self.should_repeat(group_id, message, sender_id, bot_id):
             return None
 
         # 标记该群聊刚刚复读过

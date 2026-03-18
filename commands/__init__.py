@@ -1,28 +1,7 @@
 """
-指令功能模块 - 用户主动触发的命令
+指令功能模块
+现在所有指令都通过独立的 *_command.py 文件实现
 """
-from .base import BaseFeature
-from .manager import FeatureManager
 
-# 导出具体功能
-from .dice import DiceFeature
-from .fortune import FortuneFeature
-from .rps import RPSFeature
-from .sign_in import SignInFeature
-from .greet import GreetFeature
-from .random_number import RandomNumberFeature
-from .water import WaterFeature
-
-__all__ = [
-    # 基础类
-    'BaseFeature',
-    'FeatureManager',
-    # 具体功能
-    'DiceFeature',
-    'FortuneFeature',
-    'RPSFeature',
-    'SignInFeature',
-    'GreetFeature',
-    'RandomNumberFeature',
-    'WaterFeature'
-]
+# 这个文件现在主要用于标识这是一个Python包
+# 所有指令功能都通过组合模式在main.py中使用

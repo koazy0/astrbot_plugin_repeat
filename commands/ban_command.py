@@ -1,113 +1,25 @@
 """
-复读bot插件主程序
-插件入口，负责消息路由和模块协调
+抽烟指令功能
+支持多种方式指定目标用户和时长
 """
+import re
 from astrbot.api.all import *
 from astrbot.api.event import filter
-import sys
-from pathlib import Path
-
-# 添加插件根目录到 Python 路径
-plugin_path = Path(__file__).parent
-sys.path.insert(0, str(plugin_path))
-
-from passive_events import ConsecutiveRepeater, RandomRepeater
-from commands.test_command import TestCommand
-from commands.roulette_command import RouletteCommand
-from commands.ban_command import BanCommand
-from commands.fortune_command import FortuneCommand
-from commands.dice_command import DiceCommand
-from commands.water_command import WaterCommand
-from commands.signin_command import SignInCommand
-from commands.greet_command import GreetCommand
 from utils.ban import BanUtils
-import logging
 
 
-@register("repeater", "无辜猫猫", "复读bot", "1.0.0")
-class RepeaterPlugin(Star):
-    """复读插件主类"""
+class BanCommand:
+    """抽烟指令功能类"""
 
-    def __init__(self, context: Context):
-        super().__init__(context)
-        self.config = context.get_config()
-
-        # 初始化日志
-        self._setup_logger()
-        self.logger.info("复读插件初始化中...")
-
-        # 初始化连续复读模式
-        self.consecutive_repeater = ConsecutiveRepeater()
-
-        # 初始化随机复读模式（2%概率）
-        self.random_repeater = RandomRepeater(repeat_probability=0.02)
-
-        # 初始化各个指令功能
-        self.test_command = TestCommand(self)
-        self.roulette_command = RouletteCommand(self)
-        self.ban_command = BanCommand(self)
-        self.fortune_command = FortuneCommand(self)
-        self.dice_command = DiceCommand(self)
-        self.water_command = WaterCommand(self)
-        self.signin_command = SignInCommand(self)
-        self.greet_command = GreetCommand(self)
-
-        self.logger.info("复读插件初始化完成")
-
-    def _setup_logger(self):
-        """配置日志"""
-        self.logger = logging.getLogger('RepeaterPlugin')
-        self.logger.setLevel(logging.INFO)
-
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-
-    @filter.command("装填")
-    async def load_bullets(self, event: AstrMessageEvent):
-        """装填子弹 - 通过组合方式实现"""
-        async for result in self.roulette_command.load_bullets_command(event):
-            yield result
-
-    @filter.command("开枪")
-    async def shoot(self, event: AstrMessageEvent):
-        """开枪 - 通过组合方式实现"""
-        async for result in self.roulette_command.shoot_command(event):
-            yield result
-
-    @filter.command("状态")
-    async def status(self, event: AstrMessageEvent):
-        """查看游戏状态 - 通过组合方式实现"""
-        async for result in self.roulette_command.status_command(event):
-            yield result
-
-    @filter.command("帮助")
-    async def help_cmd(self, event: AstrMessageEvent):
-        """显示帮助 - 通过组合方式实现"""
-        async for result in self.roulette_command.help_command(event):
-            yield result
-
-    @filter.command("走火开")
-    async def enable_misfire(self, event: AstrMessageEvent):
-        """开启随机走火 - 通过组合方式实现"""
-        async for result in self.roulette_command.enable_misfire_command(event):
-            yield result
-
-    @filter.command("走火关")
-    async def disable_misfire(self, event: AstrMessageEvent):
-        """关闭随机走火 - 通过组合方式实现"""
-        async for result in self.roulette_command.disable_misfire_command(event):
-            yield result
-
-    @filter.command("测试")
-    async def test(self, event: AstrMessageEvent):
-        """测试指令 - 通过组合方式实现"""
-        async for result in self.test_command.test_command(event):
-            yield result
+    def __init__(self, plugin_instance):
+        """
+        初始化抽烟指令
+        
+        Args:
+            plugin_instance: 主插件实例
+        """
+        self.plugin = plugin_instance
+        self.logger = plugin_instance.logger
 
     async def _get_group_members(self, event: AstrMessageEvent, group_id: int) -> dict:
         """获取群成员列表"""
@@ -139,7 +51,6 @@ class RepeaterPlugin(Star):
 
     def _parse_at_message(self, message: str) -> list:
         """解析@消息，提取被@的用户ID"""
-        import re
         # 匹配@消息格式：[CQ:at,qq=用户ID]
         at_pattern = r'\[CQ:at,qq=(\d+)\]'
         matches = re.findall(at_pattern, message)
@@ -157,7 +68,6 @@ class RepeaterPlugin(Star):
                 target_identifier: 目标标识符（可能是昵称、QQ号等），None表示自己
                 duration_minutes: 时长（分钟）
         """
-        import re
         # 移除指令前缀
         content = message.replace("/抽烟", "").replace("抽烟", "").strip()
         
@@ -239,8 +149,7 @@ class RepeaterPlugin(Star):
         
         return None
 
-    @filter.command("抽烟")
-    async def smoke(self, event: AstrMessageEvent):
+    async def smoke_command(self, event: AstrMessageEvent):
         """抽烟指令 - 支持多种目标指定方式"""
         try:
             group_id = BanUtils.get_group_id(event)
@@ -295,72 +204,17 @@ class RepeaterPlugin(Star):
             self.logger.error(f"完整错误信息: {traceback.format_exc()}")
             yield event.plain_result("❌ 抽烟失败，请重试")
 
-    @filter.command("测试抽烟")
     async def test_smoke(self, event: AstrMessageEvent):
-        """测试抽烟功能是否正常"""
+        """测试方法 - 确认方法存在"""
         yield event.plain_result("🚬 抽烟功能测试成功！")
 
-    @filter.command("禁言用户")
-    async def ban_user(self, event: AstrMessageEvent):
-        """禁言指定用户指令 - 通过组合方式实现（兼容旧指令）"""
-        try:
-            # 简单的禁言实现
-            user_id = int(event.get_sender_id())
-            user_name = BanUtils.get_user_name(event)
-            duration_seconds = 60
-            
-            ban_result = await BanUtils.ban_user(event, user_id, duration_seconds, self.logger)
-            
-            if ban_result > 0:
-                formatted_duration = BanUtils.format_ban_duration(ban_result)
-                yield event.plain_result(f"✅ 禁言成功！你被禁言 {formatted_duration}")
-            else:
-                yield event.plain_result("❌ 禁言失败！可能是权限不足或你是管理员")
-                
-        except Exception as e:
-            self.logger.error(f"禁言失败: {e}")
-            yield event.plain_result("❌ 禁言失败，请重试")
+    # 保留旧的方法以兼容性
+    async def ban_test_command(self, event: AstrMessageEvent):
+        """禁言测试指令 - 重定向到抽烟指令"""
+        async for result in self.smoke_command(event):
+            yield result
 
-    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
-    async def on_group_message(self, event: AstrMessageEvent):
-        """处理群消息 - 处理复读功能和随机走火"""
-        try:
-            group_id = str(event.message_obj.group_id)
-            message_str = event.message_str.strip()
-            sender_name = event.get_sender_name()
-            sender_id = str(event.get_sender_id())
-
-            self.logger.info(f"[复读插件] 收到消息 - 群:{group_id} 用户:{sender_name} 内容:{message_str}")
-
-            # === 随机走火检查 ===
-            # 优先检查随机走火，因为它可能会禁言用户
-            # 暂时注释掉走火功能
-            # async for result in self.roulette_command.check_misfire_for_message(event, message_str):
-            #     yield result
-            #     return  # 走火触发后，不再处理其他功能
-
-            # === 连续复读模式处理 ===
-            # 记录消息
-            self.consecutive_repeater.record_message(group_id, message_str, sender_id)
-
-            # 检查连续复读（优先判断）
-            consecutive_result = await self.consecutive_repeater.handle(event, message_str, sender_id)
-            if consecutive_result:
-                self.logger.info(f"[复读插件] 连续复读触发: {message_str}")
-                yield consecutive_result
-                return  # 复读触发后，不再处理其他功能
-
-            # === 随机复读模式处理 ===
-            # 只有连续复读未触发时，才判断随机复读
-            random_result = await self.random_repeater.handle(event, message_str, sender_id)
-            if random_result:
-                self.logger.info(f"[复读插件] 随机复读触发: {message_str}")
-                yield random_result
-                return  # 复读触发后，不再处理其他功能
-
-        except Exception as e:
-            self.logger.error(f"[复读插件] 消息处理异常: {e}")
-            import traceback
-            traceback.print_exc()
-            import traceback
-            traceback.print_exc()
+    async def ban_user_command(self, event: AstrMessageEvent):
+        """禁言指定用户指令 - 重定向到抽烟指令"""
+        async for result in self.smoke_command(event):
+            yield result

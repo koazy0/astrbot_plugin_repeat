@@ -11,11 +11,10 @@ from astrbot.api.all import *
 class RandomRepeater:
     """随机复读器 - 模式2
 
-    功能：当任何人发送消息时，有20%的概率触发复读
-    该模式独立于连续复读，随时生效
+    功能：当任何人发送消息时，有2%的概率触发复读
     """
 
-    def __init__(self, repeat_probability: float = 0.2):
+    def __init__(self, repeat_probability: float = 0.02):
         """
         Args:
             repeat_probability: 复读概率，默认0.2（20%）
@@ -29,41 +28,67 @@ class RandomRepeater:
         self.logger = logging.getLogger('RandomRepeater')
         self.logger.setLevel(logging.INFO)
 
-    def should_repeat(self, group_id: str) -> bool:
+    def should_repeat(self, group_id: str, sender_id: str, bot_id: str, message: str) -> bool:
         """判断是否应该复读
 
         Args:
             group_id: 群聊ID
+            sender_id: 发送者ID
+            bot_id: 机器人ID
+            message: 消息内容
 
         Returns:
             bool: 是否应该复读
         """
-        # 检查是否刚刚复读过，避免复读自己的复读
-        if group_id in self._last_repeat_groups:
-            self._last_repeat_groups.remove(group_id)
+        # 防止复读机器人自己的消息
+        if sender_id == bot_id:
+            return False
+
+        # 防止复读指令消息
+        if self._is_command_message(message):
             return False
 
         # 随机判断是否复读
         return random.random() < self.repeat_probability
 
+    def _is_command_message(self, message: str) -> bool:
+        """判断是否是指令消息"""
+        message = message.strip()
+        
+        # 检查所有指令
+        commands = [
+            "装填", "开枪", "状态", "帮助", "走火开", "走火关",
+            "抽签", "掷骰子", "丢骰子", "猜拳", "随机", "喝水", 
+            "测试", "sign", "greet"
+        ]
+        
+        for cmd in commands:
+            if message == cmd or message.startswith(cmd + " "):
+                return True
+                
+        return False
+
     async def handle(
         self,
         event: AstrMessageEvent,
-        message: str
+        message: str,
+        sender_id: str
     ) -> Optional[str]:
         """处理复读逻辑
 
         Args:
             event: 消息事件
             message: 消息内容
+            sender_id: 发送者ID
 
         Returns:
             Optional[str]: 复读结果或None
         """
         group_id = str(event.message_obj.group_id)
+        bot_id = str(event.message_obj.self_id)
 
         # 判断是否应该复读
-        if not self.should_repeat(group_id):
+        if not self.should_repeat(group_id, sender_id, bot_id, message):
             return None
 
         # 标记该群聊刚刚复读过
